@@ -9,74 +9,78 @@ body { margin: 0; padding: 0; font-family: 'PingFang SC', 'Microsoft YaHei', san
     text-decoration: none; color: #1a73e8; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
 }
 /* css/overview.css */
-/* 搜索总容器 */
+/* 搜索容器：悬浮感 */
 .search-container {
     position: absolute;
-    top: 85px;  /* 距离顶部距离，避开返回按钮 */
+    top: 20px;
     left: 20px;
-    z-index: 2001; /* 确保层级最高 */
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     width: 320px;
 }
 
-/* 搜索包装器：实现横向排列的关键 */
+/* 搜索包装器 */
 .search-wrapper {
-    display: flex; /* 开启弹性布局 */
-    gap: 0;        /* 间距 */
-    background: white;
+    display: flex;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 6px;
     border-radius: 12px;
-    overflow: hidden; /* 确保圆角能切到里面的元素 */
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border: 1px solid rgba(255,255,255,0.3);
 }
 
-/* 输入框 */
-.search-input {
-    flex: 1; /* 占据左侧所有空间 */
-    padding: 12px 15px;
+/* 输入框：去掉难看的边框 */
+#search-box {
+    flex: 1;
     border: none;
+    background: transparent;
+    padding: 10px 15px;
+    font-size: 15px;
     outline: none;
-    font-size: 14px;
-}
-
-/* 搜索按钮 */
-#search-btn {
-    padding: 0 20px;
-    background-color: #1a73e8;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-weight: bold;
-    transition: 0.2s;
-}
-
-#search-btn:hover {
-    background-color: #1557b0;
-}
-
-/* 搜索下拉结果 */
-.search-results {
-    position: absolute;
-    top: 52px; /* 紧贴在包装器下方 */
-    left: 0;
-    width: 100%;
-    background: white;
-    border-radius: 12px;
-    max-height: 250px;
-    overflow-y: auto;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
-    display: none; /* 逻辑控制显示 */
-    z-index: 2002;
-}
-
-.search-item {
-    padding: 12px 15px;
-    cursor: pointer;
-    border-bottom: 1px solid #eee;
-    font-size: 14px;
     color: #333;
 }
 
+/* 搜索按钮：现代蓝色渐变 */
+#search-btn {
+    background: linear-gradient(135deg, #1a73e8, #1557b0);
+    color: white;
+    border: none;
+    padding: 0 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+#search-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(26, 115, 232, 0.3);
+}
+
+/* 搜索结果列表：实心白底，带微光泽 */
+.search-results {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    max-height: 280px;
+    overflow-y: auto;
+    display: none; /* 逻辑控制显示 */
+    border: 1px solid #eee;
+}
+
+.search-item {
+    padding: 12px 20px;
+    cursor: pointer;
+    border-bottom: 1px solid #f5f5f5;
+    transition: background 0.2s;
+}
+
 .search-item:hover {
-    background-color: #f1f3f4;
+    background-color: #f8f9fa;
+    color: #1a73e8;
 }
 
 .search-input {
