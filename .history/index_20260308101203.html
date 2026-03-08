@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的世界旅行足迹与景点地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #map { width: 100vw; height: 100vh; }
+        
+        /* 顶部信息提示框 */
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000; /* 确保在地图图层之上 */
+            text-align: center;
+        }
+        #info-panel h3 { margin: 0 0 5px 0; color: #333; }
+        #info-panel p { margin: 0; color: #666; font-size: 0.9em; }
+        
+        /* 自定义 Popup 样式 */
+        .custom-popup .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+        }
+        .landmark-title { font-weight: bold; color: #d35400; font-size: 1.1em; margin-bottom: 5px;}
+        .landmark-link { display: inline-block; margin-top: 8px; color: #2980b9; text-decoration: none; font-weight: bold;}
+        .landmark-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div id="info-panel">
+        <h3>旅行足迹地图</h3>
+        <p>点击国家标记为"已去过" | 点击图标查看著名景点</p>
+        <p style="margin-top:5px; font-weight:bold; color:#2E8B57;">已点亮国家: <span id="visited-count">0</span></p>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // 1. 初始化地图
+        var map = L.map('map').setView([20, 0], 2); // 初始视角看世界
+
+        // 添加一个干净的底图 (浅色风格，不带国界，因为我们会用 GeoJSON 画国界)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 2. 从浏览器的 LocalStorage 读取已去过的国家数据
+        // 如果没有记录，则初始化为空数组
+        let visitedCountries = JSON.parse(localStorage.getItem('myVisitedCountries')) || [];
+        document.getElementById('visited-count').innerText = visitedCountries.length;
+
+        let geojsonLayer; // 保存国家多边形图层的引用
+
+        // 3. 定义国家的样式函数
+        function getCountryStyle(feature) {
+            const countryName = feature.properties.name;
+            const isVisited = visitedCountries.includes(countryName);
+            
+            return {
+                fillColor: isVisited ? '#2E8B57' : '#cccccc', // 已去过显示深绿色，未去过显示浅灰色
+                weight: 1, // 边框粗细
+                opacity: 1,
+                color: '#ffffff', // 边框颜色(白色)
+                fillOpacity: isVisited ? 0.7 : 0.4 // 已去过的不透明度更高
+            };
+        }
+
+        // 4. 加载国家边界数据并添加点击交互
+        fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
+            .then(response => response.json())
+            .then(data => {
+                geojsonLayer = L.geoJSON(data, {
+                    style: getCountryStyle,
+                    onEachFeature: function(feature, layer) {
+                        // 添加点击事件
+                        layer.on('click', function(e) {
+                            const countryName = feature.properties.name;
+                            const index = visitedCountries.indexOf(countryName);
+
+                            if (index > -1) {
+                                // 如果已经去过，再次点击则取消打卡
+                                visitedCountries.splice(index, 1);
+                            } else {
+                                // 如果没去过，加入打卡列表
+                                visitedCountries.push(countryName);
+                            }
+
+                            // 保存到 LocalStorage
+                            localStorage.setItem('myVisitedCountries', JSON.stringify(visitedCountries));
+                            
+                            // 更新统计数字
+                            document.getElementById('visited-count').innerText = visitedCountries.length;
+
+                            // 重新渲染该国家的颜色
+                            geojsonLayer.setStyle(getCountryStyle);
+                        });
+
+                        // 鼠标悬浮提示国家名
+                        layer.bindTooltip(feature.properties.name, {sticky: true});
+                    }
+                }).addTo(map);
+            });
+
+        // 5. 添加世界著名景点 Marker
+        const landmarks = [
+            { name: "中国 - 万里长城", lat: 40.4319, lng: 116.5704, desc: "世界中古七大奇迹之一。", link: "https://zh.wikipedia.org/wiki/长城" },
+            { name: "法国 - 埃菲尔铁塔", lat: 48.8584, lng: 2.2945, desc: "巴黎的标志性建筑，浪漫之都的象征。", link: "https://zh.wikipedia.org/wiki/艾菲尔铁塔" },
+            { name: "美国 - 自由女神像", lat: 40.6892, lng: -74.0445, desc: "纽约港的著名雕像，美国的象征。", link: "https://zh.wikipedia.org/wiki/自由女神像" },
+            { name: "秘鲁 - 马丘比丘", lat: -13.1631, lng: -72.5450, desc: "印加帝国的遗迹，被誉为天空之城。", link: "https://zh.wikipedia.org/wiki/马丘比丘" },
+            { name: "埃及 - 吉萨金字塔", lat: 29.9792, lng: 31.1342, desc: "古代世界七大奇迹中唯一尚存的建筑。", link: "https://zh.wikipedia.org/wiki/吉薩金字塔群" },
+            { name: "澳大利亚 - 悉尼歌剧院", lat: -33.8568, lng: 151.2153, desc: "20世纪最具特色的建筑之一。", link: "https://zh.wikipedia.org/wiki/悉尼歌剧院" }
+        ];
+
+        // 循环遍历景点数据，添加到地图上
+        landmarks.forEach(mark => {
+            const marker = L.marker([mark.lat, mark.lng]).addTo(map);
+            
+            // 组装 Popup 里的 HTML 内容
+            const popupContent = `
+                <div class="custom-popup">
+                    <div class="landmark-title">${mark.name}</div>
+                    <div>${mark.desc}</div>
+                    <a href="${mark.link}" target="_blank" class="landmark-link">查看维基百科 ↗</a>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+        });
+
+    </script>
+</body>
+</html>

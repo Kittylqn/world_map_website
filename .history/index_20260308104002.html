@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的世界旅行地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #E3F2FD;}
+        #map { width: 100vw; height: 100vh; background-color: #E3F2FD; }
+        
+        #info-panel {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95); padding: 12px 24px;
+            border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 1000; text-align: center;
+        }
+        
+        .emoji-icon-container { background: none; border: none; font-size: 20px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4)); transition: transform 0.2s; }
+        .emoji-icon-container:hover { transform: scale(1.4); cursor: pointer; z-index: 9999 !important;}
+
+        /* 控制面板的样式 */
+        .action-popup { text-align: center; min-width: 150px; }
+        .action-title { font-weight: bold; font-size: 1.1em; margin-bottom: 10px; color: #333; }
+        .action-btn { 
+            display: block; width: 100%; padding: 8px; margin: 5px 0; border: none; border-radius: 5px; 
+            cursor: pointer; font-weight: bold; transition: 0.2s;
+        }
+        .btn-visited { background-color: #e0f2f1; color: #00695c; }
+        .btn-visited.active { background-color: #00695c; color: white; }
+        .btn-interested { background-color: #fff3e0; color: #e65100; }
+        .btn-interested.active { background-color: #e65100; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="info-panel">
+        <h3 style="margin: 0; color: #01579B;">🌍 我的旅行地图</h3>
+        <p style="margin: 5px 0 0; color: #555; font-size: 0.9em;">已去过: <span id="visited-count" style="color:#00695c;font-weight:bold;">0</span> | 种草清单: <span id="interested-count" style="color:#e65100;font-weight:bold;">0</span></p>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        var map = L.map('map').setView([35, 105], 4); // 初始视角对准中国
+
+        // 状态存储管理
+        let visitedPlaces = JSON.parse(localStorage.getItem('myVisitedPlaces')) || [];
+        let interestedPlaces = JSON.parse(localStorage.getItem('myInterestedPlaces')) || [];
+        let allLandmarks = []; 
+        let markerLayer = L.layerGroup().addTo(map); // 用来统一管理图标的图层
+        let geojsonLayers = [];
+
+        function updateCounts() {
+            document.getElementById('visited-count').innerText = visitedPlaces.length;
+            document.getElementById('interested-count').innerText = interestedPlaces.length;
+        }
+        updateCounts();
+
+        // 根据状态决定多边形颜色
+        function getPolygonStyle(placeName) {
+            const isVisited = visitedPlaces.includes(placeName);
+            const isInterested = interestedPlaces.includes(placeName);
+            
+            let color = '#B3E5FC'; // 默认淡蓝色
+            if (isVisited) color = '#0288D1'; // 去过：深蓝色
+            else if (isInterested) color = '#FFCC80'; // 感兴趣：浅橙色
+
+            return {
+                fillColor: color, weight: 1, opacity: 1, color: '#ffffff',
+                fillOpacity: (isVisited || isInterested) ? 0.9 : 0.6
+            };
+        }
+
+        // 渲染地图图层（世界+中国省份）
+        function setupMapLayers() {
+            const worldUrl = 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json';
+            const chinaUrl = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+
+            Promise.all([fetch(worldUrl).then(r => r.json()), fetch(chinaUrl).then(r => r.json())])
+            .then(([worldData, chinaData]) => {
+                
+                // 1. 过滤掉世界地图里的 China
+                worldData.features = worldData.features.filter(f => f.properties.name !== 'China');
+                
+                // 统一处理图层互动的函数
+                const onEachFeature = (feature, layer) => {
+                    const placeName = feature.properties.name; // 国家名(英文) 或 省份名(中文)
+                    
+                    // 悬浮提示名字
+                    layer.bindTooltip(placeName, {sticky: true, direction: 'auto'});
+                    
+                    // 点击绑定控制面板
+                    layer.on('click', function(e) {
+                        const isVis = visitedPlaces.includes(placeName);
+                        const isInt = interestedPlaces.includes(placeName);
+                        
+                        // 动态生成弹出面板的 HTML
+                        const popupHtml = `
+                            <div class="action-popup">
+                                <div class="action-title">${placeName}</div>
+                                <button class="action-btn btn-visited ${isVis ? 'active' : ''}" onclick="toggleState('${placeName}', 'visited')">
+                                    ${isVis ? '✅ 已去过' : '📍 标记为去过'}
+                                </button>
+                                <button class="action-btn btn-interested ${isInt ? 'active' : ''}" onclick="toggleState('${placeName}', 'interested')">
+                                    ${isInt ? '❤️ 已种草' : '⭐ 感兴趣'}
+                                </button>
+                            </div>
+                        `;
+                        L.popup().setLatLng(e.latlng).setContent(popupHtml).openOn(map);
+                    });
+                };
+
+                // 添加世界图层
+                const worldLayer = L.geoJSON(worldData, {
+                    style: f => getPolygonStyle(f.properties.name),
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                geojsonLayers.push(worldLayer);
+
+                // 添加中国省份图层
+                const chinaLayer = L.geoJSON(chinaData, {
+                    style: f => getPolygonStyle(f.properties.name),
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                geojsonLayers.push(chinaLayer);
+            });
+        }
+
+        // 供控制面板按钮调用的全局函数
+        window.toggleState = function(placeName, type) {
+            let targetArray = type === 'visited' ? visitedPlaces : interestedPlaces;
+            let otherArray = type === 'visited' ? interestedPlaces : visitedPlaces;
+            
+            const index = targetArray.indexOf(placeName);
+            if (index > -1) {
+                targetArray.splice(index, 1); // 取消状态
+            } else {
+                targetArray.push(placeName); // 添加状态
+                // 互斥逻辑：如果去过，自动取消感兴趣
+                const otherIndex = otherArray.indexOf(placeName);
+                if (otherIndex > -1) otherArray.splice(otherIndex, 1);
+            }
+
+            // 保存并刷新
+            localStorage.setItem('myVisitedPlaces', JSON.stringify(visitedPlaces));
+            localStorage.setItem('myInterestedPlaces', JSON.stringify(interestedPlaces));
+            updateCounts();
+            
+            // 刷新地图颜色
+            geojsonLayers.forEach(layer => {
+                layer.eachLayer(l => l.setStyle(getPolygonStyle(l.feature.properties.name)));
+            });
+            
+            // 重新计算并渲染图标
+            renderMarkers();
+            
+            // 关闭弹窗
+            map.closePopup();
+        };
+
+        // 读取 CSV 并存入内存，初次不渲染图标
+        const categoryIcons = { 'mountain': '⛰️', 'nature': '🌲', 'building': '🏛️', 'default': '📍' };
+        Papa.parse("landmarks.csv", {
+            download: true, header: true, skipEmptyLines: true,
+            complete: function(results) {
+                allLandmarks = results.data;
+                renderMarkers(); // 检查是否有需要渲染的图标
+            }
+        });
+
+        // 核心逻辑：按需渲染图标
+        function renderMarkers() {
+            markerLayer.clearLayers(); // 清除现有图标
+            
+            // 检查有没有选中国省份作为“感兴趣”
+            const isChinaInterested = interestedPlaces.some(place => /省|市|自治区|特别行政区/.test(place));
+
+            allLandmarks.forEach(row => {
+                // 如果 CSV 的英文国家名 在你的 感兴趣列表 里，或者该景点在中国且你对任意中国省份感兴趣
+                const shouldShow = interestedPlaces.includes(row.country_en) || 
+                                 (row.country_en === 'China' && isChinaInterested);
+
+                if (shouldShow) {
+                    const icon = categoryIcons[row.type] || categoryIcons['default'];
+                    const customIcon = L.divIcon({
+                        className: 'emoji-icon-container',
+                        html: `<div>${icon}</div>`, iconSize: [24, 24], iconAnchor: [12, 12]
+                    });
+
+                    const marker = L.marker([parseFloat(row.lat), parseFloat(row.lng)], {icon: customIcon});
+                    marker.bindPopup(`
+                        <div style="min-width:200px;">
+                            <h4 style="margin:0 0 5px 0; color:#d35400;">🏆 ${row.name}</h4>
+                            <p style="font-size:0.9em; margin:0 0 8px 0;">${row.desc}</p>
+                            <a href="${row.link}" target="_blank">官网详情 ↗</a>
+                        </div>
+                    `);
+                    markerLayer.addLayer(marker);
+                }
+            });
+        }
+
+        setupMapLayers();
+    </script>
+</body>
+</html>

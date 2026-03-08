@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的世界旅行地图 - World Explorer</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="../css/travel.css">
+</head>
+<body>
+    <a href="../index.html" class="back-btn">⬅ 返回首页</a>
+
+    <div id="info-panel">
+        <h3 style="margin: 0; color: #01579B;">🌍 我的旅行地图</h3>
+        <p style="margin: 5px 0 0; color: #555; font-size: 0.9em;">
+            已去过: <span id="visited-count" style="color:#00695c;font-weight:bold;">0</span> | 
+            种草清单: <span id="interested-count" style="color:#e65100;font-weight:bold;">0</span>
+        </p>
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="搜索国家或省份..." list="places-list">
+            <datalist id="places-list"></datalist>
+            <button id="search-btn" onclick="searchPlace()">飞去看看</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <script src="../js/countries.js"></script>
+    <script src="../js/travel.js"></script>
+</body>
+</html>

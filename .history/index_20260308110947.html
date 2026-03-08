@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Map - 探索地球</title>
+    <style>
+        :root {
+            --primary-color: #0288D1;
+            --hover-color: #01579B;
+            --bg-gradient-start: #E3F2FD;
+            --bg-gradient-end: #BBDEFB;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+        }
+
+        /* 顶部标题区 */
+        .hero {
+            text-align: center;
+            margin-top: 10vh;
+            margin-bottom: 50px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            color: var(--primary-color);
+            margin: 0;
+            letter-spacing: 2px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: #555;
+            margin-top: 15px;
+        }
+
+        /* 导航卡片网格 */
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            width: 80%;
+            max-width: 1000px;
+            padding: 20px;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 5px;
+            background: var(--primary-color);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+            transform-origin: left;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(2, 136, 209, 0.2);
+            cursor: pointer;
+        }
+
+        .card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .card-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: inline-block;
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover .card-icon {
+            transform: scale(1.1);
+        }
+
+        .card h2 {
+            margin: 0 0 15px 0;
+            font-size: 1.5rem;
+            color: #222;
+        }
+
+        .card p {
+            margin: 0;
+            color: #666;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        /* 占位卡片（灰色禁用状态） */
+        .card.disabled {
+            background: rgba(255, 255, 255, 0.5);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .card.disabled:hover {
+            transform: none;
+        }
+        .card.disabled::before {
+            background: #999;
+        }
+
+        /* 简单的进入动画 */
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* 卡片依次进场动画 */
+        .card { animation: fadeInUp 0.8s ease-out backwards; }
+        .card:nth-child(1) { animation-delay: 0.2s; }
+        .card:nth-child(2) { animation-delay: 0.4s; }
+        .card:nth-child(3) { animation-delay: 0.6s; }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="hero">
+        <h1>🌍 World Map</h1>
+        <p>探索世界，记录足迹，分析数据</p>
+    </div>
+
+    <div class="nav-grid">
+        <a href="pages/travel.html" class="card">
+            <span class="card-icon">🗺️</span>
+            <h2>旅游地图</h2>
+            <p>交互式 3D 视角，打卡去过的国家与省份，点亮你的全球种草清单。</p>
+        </a>
+
+        <a href="pages/overview.html" class="card" onclick="checkDev(event, 'pages/overview.html')">
+            <span class="card-icon">📊</span>
+            <h2>数据概览</h2>
+            <p>可视化旅行面板：统计飞行里程、解锁大洲进度、生成年度足迹报告。</p>
+        </a>
+
+        <div class="card disabled">
+            <span class="card-icon">🚀</span>
+            <h2>更多功能</h2>
+            <p>游记博客、相册墙、行程规划工具正在努力开发中，敬请期待...</p>
+        </div>
+    </div>
+
+    <script>
+        // 这是一个小彩蛋+防报错机制
+        // 如果你点击了还没建好的页面，会弹出友好提示，而不是显示找不到网页
+        function checkDev(event, url) {
+            // 简单的检查机制：如果是我们还没做的概览页，先拦截一下
+            if (url === 'overview.html') {
+                event.preventDefault(); // 阻止默认跳转
+                alert("🛠️ 数据概览页面正在紧锣密鼓地建设中，马上就来！\n\n你可以先去【旅游地图】里多标记几个国家！");
+            }
+        }
+    </script>
+</body>
+</html>

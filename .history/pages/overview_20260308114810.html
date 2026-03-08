@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球宏观数据探索 - World Explorer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <style>
+        /* 基础布局：清爽浅色模式 */
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background-color: #f0f4f8;}
+        #map { width: 100vw; height: 100vh; background-color: #E3F2FD; } /* 浅蓝色海水 */
+        
+        /* 1. 返回按钮 */
+        .back-btn {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            background: white; padding: 10px 18px; border-radius: 10px;
+            text-decoration: none; color: #1a73e8; font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: 0.3s;
+        }
+        .back-btn:hover { transform: translateX(-5px); box-shadow: 0 6px 15px rgba(0,0,0,0.15); }
+
+        /* 2. 右上角控制面板 */
+        .control-panel {
+            position: absolute; top: 20px; right: 20px; z-index: 1000;
+            background: rgba(255,255,255,0.95); padding: 20px; border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1); width: 280px; backdrop-filter: blur(8px);
+        }
+        .control-panel h3 { margin: 0 0 15px 0; font-size: 1.2rem; color: #202124; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        
+        select {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #dadce0;
+            background: #f8f9fa; font-size: 14px; cursor: pointer; outline: none; margin-bottom: 10px;
+        }
+        optgroup { font-style: normal; font-weight: 700; color: #1a73e8; }
+
+        /* 3. 连续色带图例 */
+        .color-legend-container { margin-top: 15px; }
+        .color-scale-bar {
+            width: 100%; height: 12px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.05);
+            background: #ccc; /* 初始灰色，由JS更新 */
+        }
+        .label-row { display: flex; justify-content: space-between; font-size: 11px; color: #5f6368; margin-top: 5px; font-weight: 500;}
+
+        /* 4. 右下角释义卡片 */
+        .info-card {
+            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.98); width: 300px;
+            border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            transition: all 0.3s ease; overflow: hidden;
+        }
+        .info-card-header {
+            background: #f8f9fa; padding: 12px 15px; display: flex;
+            justify-content: space-between; align-items: center;
+            cursor: pointer; border-bottom: 1px solid #eee;
+        }
+        .info-card-header h4 { margin: 0; font-size: 14px; color: #1a73e8; }
+        .toggle-icon { font-size: 12px; transition: transform 0.3s; }
+        .info-card-content { padding: 15px; font-size: 13px; line-height: 1.6; color: #444; }
+        
+        /* 卡片折叠状态 */
+        .info-card.collapsed { height: 42px; width: 140px; }
+        .info-card.collapsed .toggle-icon { transform: rotate(-180deg); }
+        .info-card.collapsed .info-card-content { display: none; }
+    </style>
+</head>
+<body>
+
+    <a href="../index.html" class="back-btn">⬅ 返回大堂</a>
+
+    <div class="control-panel">
+        <h3>📊 全球指标探索</h3>
+        <select id="indicator-select" onchange="updateView()">
+            <optgroup label="💰 经济与财富">
+                <option value="gdp_total">总 GDP (十亿美元)</option>
+                <option value="gdp_per_capita" selected>人均 GDP (美元)</option>
+                <option value="gdp_growth">经济增速 (%)</option>
+                <option value="gini">基尼系数 (不平等度)</option>
+            </optgroup>
+            <optgroup label="👥 人口与社会">
+                <option value="pop_density">人口密度 (人/km²)</option>
+                <option value="hdi">人类发展指数 (HDI)</option>
+                <option value="median_age">年龄中位数</option>
+                <option value="internet_user">互联网普及率 (%)</option>
+            </optgroup>
+            <optgroup label="🌍 环境与气象">
+                <option value="forest_area">森林覆盖率 (%)</option>
+                <option value="co2_per_capita">人均碳排放 (吨)</option>
+                <option value="avg_temp">年平均气温 (℃)</option>
+            </optgroup>
+        </select>
+
+        <div class="color-legend-container">
+            <div id="scale-bar" class="color-scale-bar"></div>
+            <div class="label-row">
+                <span id="min-label"></span>
+                <span id="med-label"></span>
+                <span id="max-label"></span>
+            </div>
+        </div>
+    </div>
+
+    <div id="desc-card" class="info-card">
+        <div class="info-card-header" onclick="toggleCard()">
+            <h4>💡 指标释义</h4>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="info-card-content" id="indicator-desc">
+            </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // 1. 初始化地图
+        const map = L.map('map').setView([20, 10], 2);
+        let macroData = {}, geojsonLayers = [];
+        let currentIndicator = 'gdp_per_capita';
+
+        // 2. 指标释义库
+        const indicatorInfo = {
+            gdp_total: "<b>总 GDP</b>：代表经济体量。反映了一个国家的综合经济实力和市场规模。",
+            gdp_per_capita: "<b>人均 GDP</b>：最直观的生活水平指标。数值越高，通常代表国民越富裕。",
+            gdp_growth: "<b>经济增速</b>：GDP年增长率。反映经济活力，正值代表扩张，负值代表衰退。",
+            gini: "<b>基尼系数</b>：衡量收入分配公平程度。0最平均，100最不平等。40通常是国际警戒线。",
+            pop_density: "<b>人口密度</b>：每平方公里居住人数。反映土地承载压力和城市化程度。",
+            hdi: "<b>人类发展指数</b>：综合寿命、教育和收入。0.8以上被视为极高发展水平。",
+            median_age: "<b>年龄中位数</b>：反映人口结构。中位数高意味着老龄化严重（如日本），低则代表年轻（如非洲）。",
+            internet_user: "<b>互联网普及率</b>：接入网络人口占比。衡量数字化程度和信息基础设施。",
+            forest_area: "<b>森林覆盖率</b>：绿色植被占比。反映生态保护水平和自然资源禀赋。",
+            co2_per_capita: "<b>人均碳排放</b>：个人平均年排碳量。衡量工业化程度与环境责任。",
+            avg_temp: "<b>年平均气温</b>：长年气候平均值。影响农业、能源消耗和自然景观。"
+        };
+
+        // 3. 配色分级函数
+        function getColor(d, ind) {
+            if (d === null || d === undefined || isNaN(d)) return '#e0e0e0';
+            const configs = {
+                gdp_total:       { bins: [10000, 5000, 1000, 500, 100], colors: ['#08306b', '#08519c', '#2171b5', '#4292c6', '#9ecae1', '#deebf7'] },
+                gdp_per_capita:  { bins: [60000, 40000, 20000, 10000, 5000], colors: ['#00441b', '#006d2c', '#238b45', '#41ab5d', '#a1d99b', '#e5f5e0'] },
+                gdp_growth:      { bins: [5, 3, 1, 0, -1], colors: ['#006837', '#31a354', '#addd8e', '#fee391', '#fec44f', '#d95f0e'] },
+                gini:            { bins: [50, 45, 40, 35, 30], colors: ['#7f0000', '#b30000', '#d7301f', '#ef6548', '#fc8d59', '#fee8c8'] },
+                pop_density:     { bins: [500, 200, 100, 50, 10], colors: ['#67000d', '#a50f15', '#cb181d', '#ef3b2c', '#fb6a4a', '#fff5f0'] },
+                hdi:             { bins: [0.9, 0.8, 0.7, 0.6, 0.5], colors: ['#3f007d', '#54278f', '#6a51a3', '#807dba', '#bcbddc', '#f2f0f7'] },
+                median_age:      { bins: [45, 40, 35, 30, 20], colors: ['#49006a', '#7a0177', '#ae017e', '#dd3497', '#fa9fb5', '#fde0ef'] },
+                internet_user:   { bins: [90, 80, 60, 40, 20], colors: ['#014636', '#016c59', '#02818a', '#3690c0', '#a6bddb', '#ece2f0'] },
+                forest_area:     { bins: [60, 45, 30, 15, 5], colors: ['#00441b', '#006d2c', '#238b45', '#41ab5d', '#a1d99b', '#e5f5e0'] },
+                co2_per_capita:  { bins: [15, 10, 5, 2, 1], colors: ['#7f2704', '#a63603', '#d94801', '#f16913', '#fdae6b', '#fff5eb'] },
+                avg_temp:        { bins: [25, 15, 5, 0, -10], colors: ['#7f0000', '#d73027', '#fee090', '#e0f3f8', '#4575b4', '#313695'] }
+            };
+            const conf = configs[ind];
+            for (let i = 0; i < conf.bins.length; i++) { if (d >= conf.bins[i]) return conf.colors[i]; }
+            return conf.colors[conf.colors.length - 1];
+        }
+
+        // 4. 更新视图 (地图颜色 + 色带 + 释义)
+        function updateView() {
+            currentIndicator = document.getElementById('indicator-select').value;
+            
+            // 更新地图
+            geojsonLayers.forEach(l => l.setStyle(f => ({
+                fillColor: getColor(macroData[f.properties.name]?.[currentIndicator], currentIndicator),
+                weight: 1, color: 'white', fillOpacity: 0.85
+            })));
+
+            // 更新色带
+            const legendConfigs = {
+                gdp_total:       { grad: 'linear-gradient(to right, #deebf7, #4292c6, #08306b)', min: '100', med: '1000', max: '10000+' },
+                gdp_per_capita:  { grad: 'linear-gradient(to right, #e5f5e0, #41ab5d, #00441b)', min: '5k', med: '20k', max: '60k+' },
+                gdp_growth:      { grad: 'linear-gradient(to right, #d95f0e, #fee391, #006837)', min: '-1%', med: '1%', max: '5%+' },
+                gini:            { grad: 'linear-gradient(to right, #fee8c8, #ef6548, #7f0000)', min: '30', med: '40', max: '50+' },
+                pop_density:     { grad: 'linear-gradient(to right, #fff5f0, #ef3b2c, #67000d)', min: '10', med: '100', max: '500+' },
+                hdi:             { grad: 'linear-gradient(to right, #f2f0f7, #807dba, #3f007d)', min: '0.5', med: '0.7', max: '0.9+' },
+                median_age:      { grad: 'linear-gradient(to right, #fde0ef, #dd3497, #49006a)', min: '20', med: '35', max: '45+' },
+                internet_user:   { grad: 'linear-gradient(to right, #ece2f0, #3690c0, #014636)', min: '20%', med: '60%', max: '90%+' },
+                forest_area:     { grad: 'linear-gradient(to right, #e5f5e0, #41ab5d, #00441b)', min: '5%', med: '30%', max: '60%+' },
+                co2_per_capita:  { grad: 'linear-gradient(to right, #fff5eb, #fdae6b, #7f2704)', min: '1t', med: '5t', max: '15t+' },
+                avg_temp:        { grad: 'linear-gradient(to right, #313695, #e0f3f8, #f8f9fa, #fee090, #7f0000)', min: '-10', med: '5', max: '25℃' }
+            };
+            const cfg = legendConfigs[currentIndicator];
+            document.getElementById('scale-bar').style.background = cfg.grad;
+            document.getElementById('min-label').innerText = cfg.min;
+            document.getElementById('med-label').innerText = cfg.med;
+            document.getElementById('max-label').innerText = cfg.max;
+
+            // 更新释义
+            document.getElementById('indicator-desc').innerHTML = indicatorInfo[currentIndicator];
+        }
+
+        // 5. 释义卡片折叠开关
+        function toggleCard() {
+            document.getElementById('desc-card').classList.toggle('collapsed');
+        }
+
+        // 6. 加载数据与地图
+        Papa.parse("../data/macro_data.csv", {
+            download: true, header: true, complete: function(results) {
+                results.data.forEach(r => macroData[r.place_id] = r);
+                loadGeoJson();
+            }
+        });
+
+        function loadGeoJson() {
+            const worldUrl = 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json';
+            const chinaUrl = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+            
+            Promise.all([fetch(worldUrl).then(r => r.json()), fetch(chinaUrl).then(r => r.json())])
+            .then(([world, china]) => {
+                world.features = world.features.filter(f => f.properties.name !== 'China');
+                const onEach = (f, l) => {
+                    l.on('mouseover', function() {
+                        const val = macroData[f.properties.name]?.[currentIndicator] || '暂无数据';
+                        l.bindTooltip(`<b>${f.properties.name}</b><br>数值: ${val}`, {sticky:true}).openTooltip();
+                    });
+                };
+                geojsonLayers.push(L.geoJSON(world, {onEachFeature: onEach}).addTo(map));
+                geojsonLayers.push(L.geoJSON(china, {onEachFeature: onEach}).addTo(map));
+                updateView(); // 初始化渲染
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+/* 基础与布局 */
+body { margin: 0; padding: 0; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: #f0f4f8; overflow: hidden;}
+#map { width: 100vw; height: 100vh; background-color: #E3F2FD; } 
+
+/* 按钮与搜索 */
+.back-btn { 
+    position: absolute; top: 20px; left: 20px; z-index: 1001; 
+    background: white; padding: 10px 18px; border-radius: 10px; 
+    text-decoration: none; color: #1a73e8; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
+}
+.search-container { position: absolute; top: 85px; left: 20px; z-index: 1001; width: 280px; }
+.search-input { width: 100%; padding: 12px 15px; border-radius: 10px; border: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); outline: none; }
+.search-results { background: white; border-radius: 10px; margin-top: 5px; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.search-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px; }
+
+/* 详情卡片美化 */
+.detail-card { 
+    position: absolute; top: 145px; left: 20px; z-index: 1001; 
+    background: white; width: 300px; border-radius: 16px; 
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15); display: none; overflow: hidden;
+}
+.detail-card-header { 
+    padding: 15px 20px; background: #1a73e8; color: white; 
+    display: flex; justify-content: space-between; align-items: center;
+}
+.detail-card-content { padding: 10px 20px; max-height: 400px; overflow-y: auto; }
+.data-row { 
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px; 
+}
+.data-row span { color: #666; }
+.data-row b { color: #1a73e8; font-family: 'Consolas', monospace; }
+
+/* 控制面板与图例 */
+.control-panel { 
+    position: absolute; top: 20px; right: 20px; z-index: 1000; 
+    background: rgba(255,255,255,0.95); padding: 20px; border-radius: 16px; 
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1); width: 260px; 
+}
+#indicator-select { width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #ddd; outline: none; }
+.color-scale-bar { width: 100%; height: 12px; border-radius: 6px; margin-top: 15px; transition: background 0.5s; }
+.label-row { display: flex; justify-content: space-between; font-size: 11px; margin-top: 8px; color: #444; font-weight: bold; }
+
+/* 指标说明 */
+.info-card { 
+    position: absolute; bottom: 30px; right: 20px; z-index: 1000; 
+    background: white; width: 280px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
+}
+.info-card-header { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+.info-card-content { padding: 15px; font-size: 12.5px; color: #444; line-height: 1.6; }
+.collapsed { height: 44px; overflow: hidden; }
+
+/* 地图缩放按钮 */
+.leaflet-left.leaflet-bottom { margin-left: 20px; margin-bottom: 30px; }

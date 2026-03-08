@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球宏观数据探索 - World Explorer</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="overview.css">
+</head>
+<body>
+
+    <a href="../index.html" class="back-btn">⬅ 返回大堂</a>
+
+    <div class="search-container">
+        <input type="text" class="search-input" id="search-box" placeholder="搜索国家或城市..." oninput="handleSearch()">
+        <div id="search-results" class="search-results"></div>
+    </div>
+
+    <div id="detail-card" class="detail-card">
+        <div class="detail-card-header">
+            <h4 id="detail-title" style="margin:0">详情</h4>
+            <span style="cursor:pointer;" onclick="closeDetail()">×</span>
+        </div>
+        <div id="detail-body" class="detail-card-content"></div>
+    </div>
+
+    <div class="control-panel">
+        <h3 style="margin:0 0 10px 0; font-size:1rem;">📊 全球数据视图</h3>
+        <select id="indicator-select" onchange="updateView()">
+            <option value="gdp_per_capita" selected>人均 GDP ($)</option>
+            <option value="gdp_total">总 GDP (十亿$)</option>
+            <option value="gdp_growth">经济增速 (%)</option>
+            <option value="pop_density">人口密度</option>
+            <option value="hdi">HDI 指数</option>
+        </select>
+        <div id="scale-bar" class="color-scale-bar"></div>
+        <div class="label-row">
+            <span id="label-min">MIN</span>
+            <span id="label-avg">AVG</span>
+            <span id="label-max">MAX</span>
+        </div>
+    </div>
+
+    <div id="info-card" class="info-card">
+        <div class="info-card-header" onclick="toggleInfo()">
+            <span style="font-weight:bold; color:#1a73e8">💡 指标说明</span>
+            <span id="toggle-arrow">▼</span>
+        </div>
+        <div id="indicator-desc" class="info-card-content"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="../countries.js"></script> <script src="overview.js"></script>      </body>
+</html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全球宏观数据探索 - World Explorer</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; background-color: #f0f4f8; overflow: hidden;}
+        #map { width: 100vw; height: 100vh; background-color: #E3F2FD; } 
+        
+        /* 左上角：返回 */
+        .back-btn {
+            position: absolute; top: 20px; left: 20px; z-index: 1001;
+            background: white; padding: 10px 18px; border-radius: 10px;
+            text-decoration: none; color: #1a73e8; font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); transition: 0.3s;
+        }
+
+        /* 左侧：搜索 */
+        .search-container {
+            position: absolute; top: 85px; left: 20px; z-index: 1001; width: 280px;
+        }
+        .search-input {
+            width: 100%; padding: 12px 15px; border-radius: 10px; border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); outline: none; font-size: 14px;
+        }
+        .search-results {
+            background: white; border-radius: 10px; margin-top: 5px; 
+            max-height: 200px; overflow-y: auto; display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .search-item { padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px; }
+        .search-item:hover { background: #f0f7ff; }
+
+        /* 左侧：详情 */
+        .detail-card {
+            position: absolute; top: 145px; left: 20px; z-index: 1001;
+            background: white; width: 280px; border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15); display: none;
+        }
+        .detail-card-header { 
+            padding: 15px; background: #1a73e8; color: white; border-radius: 16px 16px 0 0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .detail-card-content { padding: 15px; max-height: 350px; overflow-y: auto; }
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; border-bottom: 1px dashed #eee; padding-bottom: 4px; }
+        .data-value { font-weight: 600; color: #1a73e8; }
+
+        /* 右上角：控制台 */
+        .control-panel {
+            position: absolute; top: 20px; right: 20px; z-index: 1000;
+            background: rgba(255,255,255,0.95); padding: 20px; border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1); width: 260px; backdrop-filter: blur(8px);
+        }
+        .color-scale-bar { width: 100%; height: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid rgba(0,0,0,0.05); }
+        .label-row { display: flex; justify-content: space-between; font-size: 11px; margin-top: 5px; color: #666; }
+
+        /* 右下角：指标释义 */
+        .info-card {
+            position: absolute; bottom: 30px; right: 20px; z-index: 1000;
+            background: white; width: 280px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        .info-card-header { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;}
+        .info-card-content { padding: 15px; font-size: 12.5px; line-height: 1.6; color: #444; }
+        .collapsed { height: 44px; overflow: hidden; }
+
+        /* 强制缩放控件到左下角，并避开详情卡片 */
+        .leaflet-left.leaflet-bottom { margin-left: 20px; margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+
+    <a href="../index.html" class="back-btn">⬅ 返回首页</a>
+
+    <div class="search-container">
+        <input type="text" class="search-input" id="search-box" placeholder="搜索国家或中国省份..." oninput="handleSearch()">
+        <div id="search-results" class="search-results"></div>
+    </div>
+
+    <div id="detail-card" class="detail-card">
+        <div class="detail-card-header">
+            <h4 id="detail-title" style="margin:0">详情</h4>
+            <span style="cursor:pointer; font-size: 20px;" onclick="closeDetail()">×</span>
+        </div>
+        <div id="detail-body" class="detail-card-content"></div>
+    </div>
+
+    <div class="control-panel">
+        <h3 style="margin:0 0 15px 0; font-size:1.1rem; color:#333;">📊 数据维度</h3>
+        <select id="indicator-select" style="width:100%; padding:8px; border-radius:5px" onchange="updateView()">
+            <optgroup label="💰 经济财富">
+                <option value="gdp_total">总 GDP (十亿美元)</option>
+                <option value="gdp_per_capita" selected>人均 GDP (美元)</option>
+                <option value="gdp_growth">经济增速 (%)</option>
+            </optgroup>
+            <optgroup label="👥 人口社会">
+                <option value="pop_density">人口密度 (人/km²)</option>
+                <option value="hdi">人类发展指数 (HDI)</option>
+                <option value="median_age">年龄中位数</option>
+            </optgroup>
+        </select>
+        <div id="scale-bar" class="color-scale-bar"></div>
+        <div class="label-row">
+            <span id="min-label">低值</span><span id="med-label">中间</span><span id="max-label">高值</span>
+        </div>
+    </div>
+
+    <div id="info-card" class="info-card">
+        <div class="info-card-header" onclick="toggleInfo()">
+            <span style="font-size:13px; font-weight:bold; color:#1a73e8">💡 指标释义</span>
+            <span id="toggle-arrow">▼</span>
+        </div>
+        <div id="indicator-desc" class="info-card-content"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // 1. 地图初始化：缩放按钮移至左下角
+        const map = L.map('map', { zoomControl: false, minZoom: 2 }).setView([30, 10], 2);
+        L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+        let macroData = {}, geojsonLayers = [], allFeatures = [];
+        let currentIndicator = 'gdp_per_capita';
+
+        const countryNameMap = {
+    // 亚洲
+    "China": "中国",
+    "Japan": "日本",
+    "South Korea": "韩国",
+    "North Korea": "朝鲜",
+    "India": "印度",
+    "Vietnam": "越南",
+    "Thailand": "泰国",
+    "Malaysia": "马来西亚",
+    "Singapore": "新加坡",
+    "Indonesia": "印度尼西亚",
+    "Philippines": "菲律宾",
+    "Pakistan": "巴基斯坦",
+    "Bangladesh": "孟加拉国",
+    "Sri Lanka": "斯里兰卡",
+    "Myanmar": "缅甸",
+    "Cambodia": "柬埔寨",
+    "Laos": "老挝",
+    "Nepal": "尼泊尔",
+    "Mongolia": "蒙古",
+    "Kazakhstan": "哈萨克斯坦",
+    "Uzbekistan": "乌兹别克斯坦",
+    "Turkmenistan": "土库曼斯坦",
+    "Kyrgyzstan": "吉尔吉斯斯坦",
+    "Tajikistan": "塔吉克斯坦",
+    "Iran": "伊朗",
+    "Iraq": "伊拉克",
+    "Saudi Arabia": "沙特阿拉伯",
+    "United Arab Emirates": "阿联酋",
+    "Turkey": "土耳其",
+    "Israel": "以色列",
+    "Palestine": "巴勒斯坦",
+    "Jordan": "约旦",
+    "Syria": "叙利亚",
+    "Lebanon": "黎巴嫩",
+    "Kuwait": "科威特",
+    "Oman": "阿曼",
+    "Qatar": "卡塔尔",
+    "Yemen": "也门",
+    "Afghanistan": "阿富汗",
+    "Georgia": "格鲁吉亚",
+    "Armenia": "亚美尼亚",
+    "Azerbaijan": "阿塞拜疆",
+
+    // 欧洲
+    "Greenland": "格陵兰岛",
+    "Russia": "俄罗斯",
+    "Germany": "德国",
+    "France": "法国",
+    "United Kingdom": "英国",
+    "Italy": "意大利",
+    "Spain": "西班牙",
+    "Portugal": "葡萄牙",
+    "Netherlands": "荷兰",
+    "Belgium": "比利时",
+    "Switzerland": "瑞士",
+    "Austria": "奥地利",
+    "Greece": "希腊",
+    "Sweden": "瑞典",
+    "Norway": "挪威",
+    "Denmark": "丹麦",
+    "Finland": "芬兰",
+    "Ireland": "爱尔兰",
+    "Poland": "波兰",
+    "Czech Republic": "捷克",
+    "Slovakia": "斯洛伐克",
+    "Hungary": "匈牙利",
+    "Romania": "罗马尼亚",
+    "Bulgaria": "保加利亚",
+    "Serbia": "塞尔维亚",
+    "Croatia": "克罗地亚",
+    "Slovenia": "斯洛文尼亚",
+    "Bosnia and Herzegovina": "波黑",
+    "Montenegro": "黑山",
+    "North Macedonia": "北马其顿",
+    "Albania": "阿尔巴尼亚",
+    "Ukraine": "乌克兰",
+    "Belarus": "白俄罗斯",
+    "Estonia": "爱沙尼亚",
+    "Latvia": "拉脱维亚",
+    "Lithuania": "立陶宛",
+    "Moldova": "摩尔多瓦",
+    "Iceland": "冰岛",
+    "Luxembourg": "卢森堡",
+    "Monaco": "摩纳哥",
+    "Malta": "马耳他",
+
+    // 美洲
+    "Belize": "伯利兹",
+    "United States of America": "美国",
+    "Canada": "加拿大",
+    "Mexico": "墨西哥",
+    "Brazil": "巴西",
+    "Argentina": "阿根廷",
+    "Chile": "智利",
+    "Colombia": "哥伦比亚",
+    "Peru": "秘鲁",
+    "Venezuela": "委内瑞拉",
+    "Ecuador": "厄瓜多尔",
+    "Bolivia": "玻利维亚",
+    "Paraguay": "巴拉圭",
+    "Urguay": "乌拉圭",
+    "Cuba": "古巴",
+    "Jamaica": "牙买加",
+    "Panama": "巴拿马",
+    "Costa Rica": "哥斯达黎加",
+    "Guatemala": "危地马拉",
+    "Honduras": "洪都拉斯",
+    "Dominican Republic": "多米尼加",
+
+    // 大洋洲
+    "Australia": "澳大利亚",
+    "New Zealand": "新西兰",
+    "Papua New Guinea": "巴布亚新几内亚",
+    "Fiji": "斐济",
+
+    // 非洲
+    "Central African Republic": "中非共和国",
+    "Ivory Coast": "科特迪瓦",
+    "Benin": "贝宁",
+    "Burundi": "布隆迪",
+    "Egypt": "埃及",
+    "South Africa": "南非",
+    "Nigeria": "尼日利亚",
+    "Ethiopia": "埃塞俄比亚",
+    "Kenya": "肯尼亚",
+    "Algeria": "阿尔及利亚",
+    "Morocco": "摩洛哥",
+    "Libya": "利比亚",
+    "Sudan": "苏丹",
+    "Tunisia": "突尼斯",
+    "Ghana": "加纳",
+    "Cote d'Ivoire": "科特迪瓦",
+    "Senegal": "塞内加尔",
+    "Democratic Republic of the Congo": "刚果金",
+    "Republic of the Congo": "刚果布",
+    "Angola": "安哥拉",
+    "Tanzania": "坦桑尼亚",
+    "Uganda": "乌干达",
+    "Zambia": "赞比亚",
+    "Zimbabwe": "津巴布韦",
+    "Madagascar": "马达加斯加",
+    "Mauritius": "毛里求斯",
+    "Antarctica": "南极洲",
+    "French Southern and Antarctic Lands": "法属南半球和南极领地",
+    "Bermuda": "百慕大",
+    "Burkina Faso": "布基纳法索",
+    "The Bahamas": "巴哈马",
+    "Bhutan": "不丹",
+    "Djibouti": "吉布提",
+    "Falkland Islands": "福克兰群岛",
+    "Cameroon": "喀麦隆",
+    "Botswana": "博茨瓦纳",
+    "Northern Cyprus": "北塞浦路斯",
+    "Cyprus": "塞浦路斯",
+    "Equatorial Guinea": "赤道几内亚",
+    "Mozambique": "莫桑比克",
+    "Kosovo": "科索沃",
+    "Malawi": "马拉维",
+    "New Caledonia": "新喀里多尼亚",
+};
+        
+        const indicatorLabels = {
+            gdp_total: "总 GDP (十亿$)", gdp_per_capita: "人均 GDP ($)", gdp_growth: "增速 (%)",
+            pop_density: "人口密度", hdi: "HDI指数", median_age: "中位年龄"
+        };
+
+        // 核心修复：添加释义库
+        const indicatorInfo = {
+            gdp_total: "<b>总 GDP</b>：国家经济实力的“总盘子”。反映一个国家在一定时期内创造的市场价值总额。",
+            gdp_per_capita: "<b>人均 GDP</b>：最直观的生活水平指标。总GDP除以人口总数，数值越高代表国民越富裕。",
+            gdp_growth: "<b>经济增速</b>：相比上一年的经济增长百分比。超过5%通常代表经济处于快速扩张阶段。",
+            pop_density: "<b>人口密度</b>：每平方公里平均居住的人数。反映了土地承载压力和城市化程度。",
+            hdi: "<b>人类发展指数</b>：综合了寿命、受教育程度和收入。是比GDP更全面的衡量社会发展的指标。",
+            median_age: "<b>年龄中位数</b>：将人口按年龄排序，正中间那个人的年龄。中位数越高，代表老龄化趋势越明显。"
+        };
+
+        function getCnName(enName) { return countryNameMap[enName] || enName; }
+
+        function getColor(d, ind) {
+            if (d === null || d === undefined || isNaN(d)) return '#e0e0e0';
+            const configs = {
+                gdp_total: { bins: [10000, 1000, 100], colors: ['#08306b', '#4292c6', '#deebf7'] },
+                gdp_per_capita: { bins: [50000, 10000, 2000], colors: ['#00441b', '#41ab5d', '#e5f5e0'] },
+                gdp_growth: { bins: [5, 1, -1], colors: ['#006837', '#fee391', '#d95f0e'] },
+                pop_density: { bins: [500, 100, 10], colors: ['#67000d', '#ef3b2c', '#fff5f0'] },
+                hdi: { bins: [0.9, 0.7, 0.5], colors: ['#3f007d', '#807dba', '#f2f0f7'] },
+                median_age: { bins: [45, 30, 20], colors: ['#49006a', '#dd3497', '#fde0ef'] }
+            };
+            const c = configs[ind] || configs['gdp_total'];
+            for(let i=0; i<c.bins.length; i++) { if(d >= c.bins[i]) return c.colors[i]; }
+            return c.colors[c.colors.length-1];
+        }
+
+        // 统一更新函数
+        function updateView() {
+            currentIndicator = document.getElementById('indicator-select').value;
+            
+            // 地图着色
+            geojsonLayers.forEach(l => l.setStyle(f => ({
+                fillColor: getColor(macroData[f.properties.name]?.[currentIndicator], currentIndicator),
+                weight: 1, color: 'white', fillOpacity: 0.8
+            })));
+            
+            // 色带更新
+            const barConfigs = {
+                gdp_total: 'linear-gradient(to right, #deebf7, #08306b)',
+                gdp_per_capita: 'linear-gradient(to right, #e5f5e0, #00441b)',
+                gdp_growth: 'linear-gradient(to right, #d95f0e, #006837)',
+                pop_density: 'linear-gradient(to right, #fff5f0, #67000d)',
+                hdi: 'linear-gradient(to right, #f2f0f7, #3f007d)',
+                median_age: 'linear-gradient(to right, #fde0ef, #49006a)'
+            };
+            document.getElementById('scale-bar').style.background = barConfigs[currentIndicator];
+
+            // 释义更新
+            document.getElementById('indicator-desc').innerHTML = indicatorInfo[currentIndicator];
+        }
+
+        function toggleInfo() {
+            const card = document.getElementById('info-card');
+            const arrow = document.getElementById('toggle-arrow');
+            card.classList.toggle('collapsed');
+            arrow.innerText = card.classList.contains('collapsed') ? '▲' : '▼';
+        }
+
+        function handleSearch() {
+            const query = document.getElementById('search-box').value.trim();
+            const resDiv = document.getElementById('search-results');
+            if(!query) { resDiv.style.display='none'; return; }
+            const matches = [];
+            if ("中国".includes(query) || "china".includes(query.toLowerCase())) matches.push({ name: "China", isGlobal: true });
+            const geoMatches = allFeatures.filter(f => getCnName(f.properties.name).includes(query) || f.properties.name.toLowerCase().includes(query.toLowerCase())).slice(0, 6);
+            const finalResults = [...matches, ...geoMatches.filter(f => f.properties.name !== "China")];
+            resDiv.innerHTML = finalResults.map(f => {
+                const name = getCnName(f.name || f.properties.name);
+                const clickAction = f.isGlobal ? `selectChinaOverall()` : `selectCountry('${f.properties.name}')`;
+                return `<div class="search-item" onclick="${clickAction}">${name}</div>`;
+            }).join('');
+            resDiv.style.display = finalResults.length ? 'block' : 'none';
+        }
+
+        function selectChinaOverall() { map.flyTo([35, 105], 4); showDetail("China"); document.getElementById('search-results').style.display = 'none'; document.getElementById('search-box').value = "中国 (总体)"; }
+
+        function selectCountry(enName) {
+            const layer = geojsonLayers.flatMap(l => Object.values(l._layers)).find(l => l.feature && l.feature.properties.name === enName);
+            if(layer) { map.flyTo(layer.getBounds().getCenter(), 4); showDetail(enName); document.getElementById('search-results').style.display = 'none'; document.getElementById('search-box').value = getCnName(enName); }
+        }
+
+        function showDetail(enName) {
+            const data = macroData[enName];
+            const cnName = getCnName(enName);
+            document.getElementById('detail-title').innerText = cnName === "China" ? "中国 (总体)" : cnName;
+            let html = '';
+            if(!data) { html = `<div style="color:#999; text-align:center; padding:20px;">暂无该地区详细数据</div>`; } 
+            else { for(let key in indicatorLabels) { html += `<div class="data-row"><span class="data-label">${indicatorLabels[key]}</span><span class="data-value">${data[key] || '-'}</span></div>`; } }
+            document.getElementById('detail-body').innerHTML = html;
+            document.getElementById('detail-card').style.display = 'block';
+        }
+
+        function closeDetail() { document.getElementById('detail-card').style.display = 'none'; }
+
+        Papa.parse("../data/macro_data.csv", {
+            download: true, header: true, skipEmptyLines: true,
+            complete: function(results) {
+                results.data.forEach(r => macroData[r.place_id] = r);
+                loadGeo();
+            }
+        });
+
+        function loadGeo() {
+            const urls = ['https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json', 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json'];
+            Promise.all(urls.map(u => fetch(u).then(r => r.json()))).then(([world, china]) => {
+                world.features = world.features.filter(f => f.properties.name !== 'China');
+                allFeatures = [...world.features, ...china.features];
+                const layerCfg = {
+                    style: f => ({ fillColor: getColor(macroData[f.properties.name]?.[currentIndicator], currentIndicator), weight: 1, color: 'white', fillOpacity: 0.8 }),
+                    onEachFeature: (f, l) => {
+                        l.on('click', (e) => { L.DomEvent.stopPropagation(e); showDetail(f.properties.name); });
+                        l.on('mouseover', () => { l.bindTooltip(getCnName(f.properties.name), { sticky: true }).openTooltip(); });
+                    }
+                };
+                geojsonLayers.push(L.geoJSON(world, layerCfg).addTo(map));
+                geojsonLayers.push(L.geoJSON(china, layerCfg).addTo(map));
+                updateView();
+            });
+        }
+        map.on('click', closeDetail);
+    </script>
+</body>
+</html>

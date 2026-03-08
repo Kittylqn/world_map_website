@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的世界旅行地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; background-color: #E3F2FD;}
+        #map { width: 100vw; height: 100vh; background-color: #E3F2FD; }
+        
+        #info-panel {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95); padding: 12px 24px;
+            border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 1000; text-align: center;
+        }
+        
+        .emoji-icon-container { background: none; border: none; font-size: 20px; filter: drop-shadow(1px 2px 2px rgba(0,0,0,0.4)); transition: transform 0.2s; }
+        .emoji-icon-container:hover { transform: scale(1.4); cursor: pointer; z-index: 9999 !important;}
+
+        /* 控制面板的样式 */
+        .action-popup { text-align: center; min-width: 150px; }
+        .action-title { font-weight: bold; font-size: 1.1em; margin-bottom: 10px; color: #333; }
+        .action-btn { 
+            display: block; width: 100%; padding: 8px; margin: 5px 0; border: none; border-radius: 5px; 
+            cursor: pointer; font-weight: bold; transition: 0.2s;
+        }
+        .btn-visited { background-color: #e0f2f1; color: #00695c; }
+        .btn-visited.active { background-color: #00695c; color: white; }
+        .btn-interested { background-color: #fff3e0; color: #e65100; }
+        .btn-interested.active { background-color: #e65100; color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="info-panel">
+        <h3 style="margin: 0; color: #01579B;">🌍 我的旅行地图</h3>
+        <p style="margin: 5px 0 0; color: #555; font-size: 0.9em;">已去过: <span id="visited-count" style="color:#00695c;font-weight:bold;">0</span> | 种草清单: <span id="interested-count" style="color:#e65100;font-weight:bold;">0</span></p>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // 初始化地图，视角对准中国
+        var map = L.map('map').setView([35, 105], 4); 
+
+        // 世界国家中英文翻译字典
+        const countryNameMap = {
+            "Afghanistan": "阿富汗", "Angola": "安哥拉", "Albania": "阿尔巴尼亚", "United Arab Emirates": "阿联酋", 
+            "Argentina": "阿根廷", "Armenia": "亚美尼亚", "Antarctica": "南极洲", "Australia": "澳大利亚", 
+            "Austria": "奥地利", "Azerbaijan": "阿塞拜疆", "Burundi": "布隆迪", "Belgium": "比利时", 
+            "Benin": "贝宁", "Burkina Faso": "布基纳法索", "Bangladesh": "孟加拉国", "Bulgaria": "保加利亚", 
+            "Bahamas": "巴哈马", "Bosnia and Herz.": "波黑", "Belarus": "白俄罗斯", "Belize": "伯利兹", 
+            "Bolivia": "玻利维亚", "Brazil": "巴西", "Brunei": "文莱", "Bhutan": "不丹", "Botswana": "博茨瓦纳", 
+            "Central African Rep.": "中非", "Canada": "加拿大", "Switzerland": "瑞士", "Chile": "智利", 
+            "Ivory Coast": "科特迪瓦", "Cameroon": "喀麦隆", "Dem. Rep. Congo": "刚果（金）", "Congo": "刚果（布）", 
+            "Colombia": "哥伦比亚", "Costa Rica": "哥斯达黎加", "Cuba": "古巴", "Northern Cyprus": "北塞浦路斯", 
+            "Cyprus": "塞浦路斯", "Czech Rep.": "捷克", "Germany": "德国", "Djibouti": "吉布提", "Denmark": "丹麦", 
+            "Dominican Rep.": "多米尼加", "Algeria": "阿尔及利亚", "Ecuador": "厄瓜多尔", "Egypt": "埃及", 
+            "Eritrea": "厄立特里亚", "Spain": "西班牙", "Estonia": "爱沙尼亚", "Ethiopia": "埃塞俄比亚", 
+            "Finland": "芬兰", "Fiji": "斐济", "France": "法国", "Gabon": "加蓬", "United Kingdom": "英国", 
+            "Georgia": "格鲁吉亚", "Ghana": "加纳", "Guinea": "几内亚", "Gambia": "冈比亚", "Guinea-Bissau": "几内亚比绍", 
+            "Eq. Guinea": "赤道几内亚", "Greece": "希腊", "Greenland": "格陵兰", "Guatemala": "危地马拉", 
+            "Guyana": "圭亚那", "Honduras": "洪都拉斯", "Croatia": "克罗地亚", "Haiti": "海地", "Hungary": "匈牙利", 
+            "Indonesia": "印度尼西亚", "India": "印度", "Ireland": "爱尔兰", "Iran": "伊朗", "Iraq": "伊拉克", 
+            "Iceland": "冰岛", "Israel": "以色列", "Italy": "意大利", "Jamaica": "牙买加", "Jordan": "约旦", 
+            "Japan": "日本", "Kazakhstan": "哈萨克斯坦", "Kenya": "肯尼亚", "Kyrgyzstan": "吉尔吉斯斯坦", 
+            "Cambodia": "柬埔寨", "Korea": "韩国", "Kuwait": "科威特", "Lao PDR": "老挝", "Lebanon": "黎巴嫩", 
+            "Liberia": "利比里亚", "Libya": "利比亚", "Sri Lanka": "斯里兰卡", "Lesotho": "莱索托", "Lithuania": "立陶宛", 
+            "Luxembourg": "卢森堡", "Latvia": "拉脱维亚", "Morocco": "摩洛哥", "Moldova": "摩尔多瓦", 
+            "Madagascar": "马达加斯加", "Mexico": "墨西哥", "Macedonia": "北马其顿", "Mali": "马里", "Myanmar": "缅甸", 
+            "Montenegro": "黑山", "Mongolia": "蒙古", "Mozambique": "莫桑比克", "Mauritania": "毛里塔尼亚", 
+            "Malawi": "马拉维", "Malaysia": "马来西亚", "Namibia": "纳米比亚", "Niger": "尼日尔", "Nigeria": "尼日利亚", 
+            "Nicaragua": "尼加拉瓜", "Netherlands": "荷兰", "Norway": "挪威", "Nepal": "尼泊尔", "New Zealand": "新西兰", 
+            "Oman": "阿曼", "Pakistan": "巴基斯坦", "Panama": "巴拿马", "Peru": "秘鲁", "Philippines": "菲律宾", 
+            "Papua New Guinea": "巴布亚新几内亚", "Poland": "波兰", "Dem. Rep. Korea": "朝鲜", "Portugal": "葡萄牙", 
+            "Paraguay": "巴拉圭", "Palestine": "巴勒斯坦", "Qatar": "卡塔尔", "Romania": "罗马尼亚", "Russia": "俄罗斯", 
+            "Rwanda": "卢旺达", "Saudi Arabia": "沙特阿拉伯", "Sudan": "苏丹", "S. Sudan": "南苏丹", "Senegal": "塞内加尔", 
+            "Sierra Leone": "塞拉利昂", "El Salvador": "萨尔瓦多", "Somalia": "索马里", "Serbia": "塞尔维亚", 
+            "Suriname": "苏里南", "Slovakia": "斯洛伐克", "Slovenia": "斯洛文尼亚", "Sweden": "瑞典", "Syria": "叙利亚", 
+            "Chad": "乍得", "Togo": "多哥", "Thailand": "泰国", "Tajikistan": "塔吉克斯坦", "Turkmenistan": "土库曼斯坦", 
+            "Timor-Leste": "东帝汶", "Trinidad and Tobago": "特立尼达和多巴哥", "Tunisia": "突尼斯", "Turkey": "土耳其", 
+            "Taiwan": "台湾", "Tanzania": "坦桑尼亚", "Uganda": "乌干达", "Ukraine": "乌克兰", "Uruguay": "乌拉圭", 
+            "United States": "美国", "Uzbekistan": "乌兹别克斯坦", "Venezuela": "委内瑞拉", "Vietnam": "越南", 
+            "Yemen": "也门", "South Africa": "南非", "Zambia": "赞比亚", "Zimbabwe": "津巴布韦"
+        };
+
+        // 状态存储管理 (从 localStorage 读取)
+        let visitedPlaces = JSON.parse(localStorage.getItem('myVisitedPlaces')) || [];
+        let interestedPlaces = JSON.parse(localStorage.getItem('myInterestedPlaces')) || [];
+        let allLandmarks = []; 
+        let markerLayer = L.layerGroup().addTo(map); // 用来统一管理图标的图层
+        let geojsonLayers = [];
+
+        // 更新顶部计数器
+        function updateCounts() {
+            document.getElementById('visited-count').innerText = visitedPlaces.length;
+            document.getElementById('interested-count').innerText = interestedPlaces.length;
+        }
+        updateCounts();
+
+        // 根据状态决定多边形颜色
+        function getPolygonStyle(placeId) {
+            const isVisited = visitedPlaces.includes(placeId);
+            const isInterested = interestedPlaces.includes(placeId);
+            
+            let color = '#B3E5FC'; // 默认淡蓝色
+            if (isVisited) color = '#0288D1'; // 去过：深蓝色
+            else if (isInterested) color = '#FFCC80'; // 感兴趣：浅橙色
+
+            return {
+                fillColor: color, weight: 1, opacity: 1, color: '#ffffff',
+                fillOpacity: (isVisited || isInterested) ? 0.9 : 0.6
+            };
+        }
+
+        // 渲染地图图层（世界+中国省份）
+        function setupMapLayers() {
+            const worldUrl = 'https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json';
+            const chinaUrl = 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+
+            Promise.all([fetch(worldUrl).then(r => r.json()), fetch(chinaUrl).then(r => r.json())])
+            .then(([worldData, chinaData]) => {
+                
+                // 1. 过滤掉世界地图里的 China，防止与省份地图重叠
+                worldData.features = worldData.features.filter(f => f.properties.name !== 'China');
+                
+                // 统一处理图层互动的函数
+                const onEachFeature = (feature, layer) => {
+                    const placeId = feature.properties.name; // 底层ID: 英文国家名 或 中文省份名
+                    const displayName = countryNameMap[placeId] || placeId; // 展示给用户的中文名
+                    
+                    // 悬浮提示中文名
+                    layer.bindTooltip(displayName, {sticky: true, direction: 'auto'});
+                    
+                    // 点击绑定控制面板
+                    layer.on('click', function(e) {
+                        const isVis = visitedPlaces.includes(placeId);
+                        const isInt = interestedPlaces.includes(placeId);
+                        
+                        // 动态生成弹出面板的 HTML
+                        const popupHtml = `
+                            <div class="action-popup">
+                                <div class="action-title">${displayName}</div>
+                                <button class="action-btn btn-visited ${isVis ? 'active' : ''}" onclick="toggleState('${placeId}', 'visited')">
+                                    ${isVis ? '✅ 已去过' : '📍 标记为去过'}
+                                </button>
+                                <button class="action-btn btn-interested ${isInt ? 'active' : ''}" onclick="toggleState('${placeId}', 'interested')">
+                                    ${isInt ? '❤️ 已种草' : '⭐ 感兴趣'}
+                                </button>
+                            </div>
+                        `;
+                        L.popup().setLatLng(e.latlng).setContent(popupHtml).openOn(map);
+                    });
+                };
+
+                // 添加世界图层
+                const worldLayer = L.geoJSON(worldData, {
+                    style: f => getPolygonStyle(f.properties.name),
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                geojsonLayers.push(worldLayer);
+
+                // 添加中国省份图层
+                const chinaLayer = L.geoJSON(chinaData, {
+                    style: f => getPolygonStyle(f.properties.name),
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+                geojsonLayers.push(chinaLayer);
+            });
+        }
+
+        // 供控制面板按钮调用的全局函数 (切换状态)
+        window.toggleState = function(placeId, type) {
+            let targetArray = type === 'visited' ? visitedPlaces : interestedPlaces;
+            let otherArray = type === 'visited' ? interestedPlaces : visitedPlaces;
+            
+            const index = targetArray.indexOf(placeId);
+            if (index > -1) {
+                targetArray.splice(index, 1); // 取消状态
+            } else {
+                targetArray.push(placeId); // 添加状态
+                // 互斥逻辑：如果去过，自动取消感兴趣；反之亦然
+                const otherIndex = otherArray.indexOf(placeId);
+                if (otherIndex > -1) otherArray.splice(otherIndex, 1);
+            }
+
+            // 保存并刷新
+            localStorage.setItem('myVisitedPlaces', JSON.stringify(visitedPlaces));
+            localStorage.setItem('myInterestedPlaces', JSON.stringify(interestedPlaces));
+            updateCounts();
+            
+            // 刷新地图颜色
+            geojsonLayers.forEach(layer => {
+                layer.eachLayer(l => l.setStyle(getPolygonStyle(l.feature.properties.name)));
+            });
+            
+            // 重新计算并渲染图标
+            renderMarkers();
+            
+            // 关闭弹窗
+            map.closePopup();
+        };
+
+        // 读取 CSV 并存入内存，初次根据状态渲染图标
+        const categoryIcons = { 'mountain': '⛰️', 'nature': '🌲', 'building': '🏛️', 'default': '📍' };
+        Papa.parse("landmarks.csv", {
+            download: true, header: true, skipEmptyLines: true,
+            complete: function(results) {
+                allLandmarks = results.data;
+                renderMarkers(); // 检查是否有需要渲染的图标
+            }
+        });
+
+        // 核心逻辑：按需渲染图标
+        function renderMarkers() {
+            markerLayer.clearLayers(); // 清除现有图标
+            
+            // 检查有没有选中国省份作为“感兴趣”
+            const isChinaInterested = interestedPlaces.some(place => /省|市|自治区|特别行政区/.test(place));
+
+            allLandmarks.forEach(row => {
+                // 如果 CSV 的英文国家名在你的感兴趣列表里，或者该景点在中国且你对任意中国省份感兴趣
+                const shouldShow = interestedPlaces.includes(row.country_en) || 
+                                 (row.country_en === 'China' && isChinaInterested);
+
+                if (shouldShow) {
+                    const icon = categoryIcons[row.type] || categoryIcons['default'];
+                    const customIcon = L.divIcon({
+                        className: 'emoji-icon-container',
+                        html: `<div>${icon}</div>`, iconSize: [24, 24], iconAnchor: [12, 12]
+                    });
+
+                    const marker = L.marker([parseFloat(row.lat), parseFloat(row.lng)], {icon: customIcon});
+                    marker.bindPopup(`
+                        <div style="min-width:200px;">
+                            <h4 style="margin:0 0 5px 0; color:#d35400;">🏆 ${row.name}</h4>
+                            <p style="font-size:0.9em; margin:0 0 8px 0;">${row.desc}</p>
+                            <a href="${row.link}" target="_blank">官网详情 ↗</a>
+                        </div>
+                    `);
+                    markerLayer.addLayer(marker);
+                }
+            });
+        }
+
+        // 启动地图！
+        setupMapLayers();
+    </script>
+</body>
+</html>

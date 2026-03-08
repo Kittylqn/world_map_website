@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的世界旅行足迹与景点地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f8ff;}
+        #map { width: 100vw; height: 100vh; background-color: #E3F2FD; /* 海洋的淡蓝色 */ }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 12px 24px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 1000;
+            text-align: center;
+        }
+        #info-panel h3 { margin: 0 0 5px 0; color: #01579B; }
+        #info-panel p { margin: 0; color: #555; font-size: 0.9em; }
+        
+        /* 隐藏 Leaflet 默认的方块背景，让 Emoji 自然显示 */
+        .emoji-icon-container {
+            background: none;
+            border: none;
+            font-size: 24px;
+            text-align: center;
+            line-height: 24px;
+            filter: drop-shadow(2px 4px 4px rgba(0,0,0,0.4)); /* 给图标加点立体阴影 */
+            transition: transform 0.2s;
+        }
+        .emoji-icon-container:hover {
+            transform: scale(1.3);
+            cursor: pointer;
+        }
+
+        .landmark-title { font-weight: bold; color: #01579B; font-size: 1.1em; margin-bottom: 5px;}
+        .landmark-link { display: inline-block; margin-top: 8px; color: #0277BD; text-decoration: none; font-weight: bold;}
+        .landmark-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div id="info-panel">
+        <h3>🌍 我的旅行地图</h3>
+        <p>点击国家进行打卡 | 点击图标查看景点</p>
+        <p style="margin-top:5px; font-weight:bold; color:#01579B;">已解锁国家: <span id="visited-count">0</span></p>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        var map = L.map('map').setView([20, 0], 2);
+
+        // 去掉复杂的底图，纯粹依赖 GeoJSON，让地图更干净
+        let visitedCountries = JSON.parse(localStorage.getItem('myVisitedCountries')) || [];
+        document.getElementById('visited-count').innerText = visitedCountries.length;
+        let geojsonLayer;
+
+        // 【全新配色方案】
+        function getCountryStyle(feature) {
+            const countryName = feature.properties.name;
+            const isVisited = visitedCountries.includes(countryName);
+            
+            return {
+                fillColor: isVisited ? '#0277BD' : '#B3E5FC', // 深蓝色 vs 淡蓝色
+                weight: 1, 
+                opacity: 1,
+                color: '#ffffff', // 国家之间的边界线为白色
+                fillOpacity: isVisited ? 0.9 : 0.6
+            };
+        }
+
+        fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json')
+            .then(response => response.json())
+            .then(data => {
+                geojsonLayer = L.geoJSON(data, {
+                    style: getCountryStyle,
+                    onEachFeature: function(feature, layer) {
+                        layer.on({
+                            mouseover: function(e) {
+                                var layer = e.target;
+                                layer.setStyle({ fillOpacity: 1, weight: 2 }); // 鼠标划过高亮
+                            },
+                            mouseout: function(e) {
+                                geojsonLayer.resetStyle(e.target); // 鼠标移开恢复
+                            },
+                            click: function(e) {
+                                const countryName = feature.properties.name;
+                                const index = visitedCountries.indexOf(countryName);
+                                if (index > -1) {
+                                    visitedCountries.splice(index, 1);
+                                } else {
+                                    visitedCountries.push(countryName);
+                                }
+                                localStorage.setItem('myVisitedCountries', JSON.stringify(visitedCountries));
+                                document.getElementById('visited-count').innerText = visitedCountries.length;
+                                geojsonLayer.setStyle(getCountryStyle);
+                            }
+                        });
+                        layer.bindTooltip(feature.properties.name, {sticky: true});
+                    }
+                }).addTo(map);
+            });
+
+        // 图标映射字典
+        const categoryIcons = {
+            'mountain': '⛰️',
+            'river': '🌊',
+            'building': '🏛️',
+            'city': '🏙️',
+            'nature': '🌲',
+            'default': '📍'
+        };
+
+        // 读取外部 CSV 文件并渲染图标
+        Papa.parse("landmarks.csv", {
+            download: true,
+            header: true, // 识别第一行为表头
+            skipEmptyLines: true,
+            complete: function(results) {
+                const data = results.data;
+                
+                data.forEach(row => {
+                    // 根据 CSV 里的 type 选择图标，找不到就用 default
+                    const emojiIcon = categoryIcons[row.type] || categoryIcons['default'];
+                    
+                    // 创建自定义的 Leaflet HTML 图标
+                    const customIcon = L.divIcon({
+                        className: 'emoji-icon-container',
+                        html: `<div>${emojiIcon}</div>`,
+                        iconSize: [30, 30],
+                        iconAnchor: [15, 15],
+                        popupAnchor: [0, -15]
+                    });
+
+                    // 添加到地图
+                    const marker = L.marker([parseFloat(row.lat), parseFloat(row.lng)], {icon: customIcon}).addTo(map);
+                    
+                    const popupContent = `
+                        <div class="custom-popup">
+                            <div class="landmark-title">${row.name}</div>
+                            <div style="font-size: 0.9em; color: #444;">${row.desc}</div>
+                            <a href="${row.link}" target="_blank" class="landmark-link">查看详情 ↗</a>
+                        </div>
+                    `;
+                    marker.bindPopup(popupContent);
+                });
+            },
+            error: function(err) {
+                console.error("加载 CSV 文件失败:", err);
+            }
+        });
+    </script>
+</body>
+</html>
