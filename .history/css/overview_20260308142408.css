@@ -9,32 +9,6 @@ body { margin: 0; padding: 0; font-family: 'PingFang SC', 'Microsoft YaHei', san
     text-decoration: none; color: #1a73e8; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
 }
 /* css/overview.css */
-.search-results {
-    position: absolute; /* 确保它是悬浮的 */
-    top: 50px; /* 紧贴搜索框下方 */
-    left: 0;
-    width: 100%;
-    background: white; /* 必须设置背景色，防止透明 */
-    border-radius: 10px;
-    margin-top: 5px;
-    max-height: 250px;
-    overflow-y: auto;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2); /* 加深阴影，增加立体感 */
-    z-index: 2000; /* 确保它在地图和所有面板之上 */
-    display: none; /* 默认隐藏 */
-}
-
-.search-item {
-    padding: 12px 15px;
-    cursor: pointer;
-    border-bottom: 1px solid #eee;
-    font-size: 14px;
-    color: #333; /* 明确文字颜色 */
-}
-
-.search-item:hover {
-    background-color: #f1f3f4; /* 增加悬停反馈 */
-}
 .search-container {
     position: absolute;
     top: 85px;
