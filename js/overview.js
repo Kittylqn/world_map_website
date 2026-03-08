@@ -137,7 +137,7 @@ Papa.parse("../data/macro_data.csv", {
         results.data.forEach(r => macroData[r.place_id] = r);
         
         const urls = [
-            'https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json',
+            'https://fastly.jsdelivr.net/gh/johan/world.geo.json@master/countries.geo.json',
             'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json'
         ];
         Promise.all(urls.map(u => fetch(u).then(r => r.json()))).then(([world, china]) => {
