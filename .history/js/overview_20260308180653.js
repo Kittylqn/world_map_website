@@ -33,17 +33,17 @@ const fieldLabelMap = {
 
 // 3. 指标视觉配置 (H: 色相)
 const indicatorThemes = {
-    gdp_per_capita: { h: 140, desc: "反映国民富裕程度。颜色越深，人均收入越高。", source: "世界银行 (World Bank) / IMF 2024" },
-    gdp_total: { h: 210, desc: "反映国家经济总量。数据已折算为十亿美元。", source: "IMF WEO / 各省统计局 2024公报" },
-    gdp_growth: { h: 30, desc: "反映经济活力。越橙红代表增长越快。", source: "各地区 2024 年度经济增速报告" },
-    gini: { h: 0, desc: "反映收入分配公平性。数值越高贫富差距越大。", source: "世界银行 / 联合国开发计划署" },
-    hdi: { h: 280, desc: "综合衡量发展水平（0-1）。反映人类发展质量。", source: "联合国开发计划署 (UNDP) 2024" },
-    pop_density: { h: 340, desc: "反映人口聚集度。深红色代表极其拥挤。", source: "2024 全球人口展望" },
-    median_age: { h: 200, desc: "反映人口老龄化程度。颜色越深代表平均年龄越高。", source: "CIA World Factbook" },
-    internet_user: { h: 180, desc: "反映数字化程度。颜色越深代表普及率越高。", source: "ITU 国际电信联盟 / CNNIC" },
-    forest_area: { h: 120, desc: "反映生态保护情况。颜色越深代表森林覆盖率越高。", source: "联合国粮农组织 (FAO)" },
-    co2_per_capita: { h: 10, desc: "反映人均碳排放。颜色越深代表排放量越高。", source: "Global Carbon Project" },
-    avg_temp: { h: 15, desc: "反映地区气候特征。颜色越深代表气温越高。", source: "NOAA / 欧洲中期预报中心" }
+    gdp_per_capita: { h: 140, desc: "反映国民富裕程度。颜色越深，人均收入越高。" },
+    gdp_total: { h: 210, desc: "反映国家经济总量。颜色越深，体量越大。" },
+    gdp_growth: { h: 30, desc: "反映经济活力。越橙红代表增长越快。" },
+    gini: { h: 0, desc: "反映收入分配公平性。颜色越深代表贫富差距越大。" },
+    hdi: { h: 280, desc: "综合衡量发展水平。紫色越深代表发展水平越高。" },
+    pop_density: { h: 340, desc: "反映人口聚集度。深红色代表极其拥挤。" },
+    median_age: { h: 200, desc: "反映人口老龄化程度。颜色越深代表平均年龄越高。" },
+    internet_user: { h: 180, desc: "反映数字化程度。颜色越深代表普及率越高。" },
+    forest_area: { h: 120, desc: "反映生态保护情况。颜色越深代表森林覆盖率越高。" },
+    co2_per_capita: { h: 10, desc: "反映人均碳排放。颜色越深代表排放量越高。" },
+    avg_temp: { h: 15, desc: "反映地区气候特征。颜色越深代表气温越高。" }
 };
 
 // 工具：安全获取国家中文名（防止字典未加载时报错）
@@ -97,17 +97,7 @@ function updateView() {
     document.getElementById('label-max').innerText = range.max;
     
     const descEl = document.getElementById('indicator-desc');
-    if(descEl && theme) { 
-        descEl.innerHTML = `
-            <div style="margin-bottom: 8px;">${theme.desc}</div>
-            <div style="font-size: 0.8rem; color: #666; border-top: 1px dashed #ddd; padding-top: 6px;">
-                <b>数据来源:</b> ${theme.source}
-            </div>
-            <div style="margin-top: 8px; padding: 6px; background: #f0f7ff; border-radius: 4px; font-size: 0.8rem; color: #0056b3; border-left: 3px solid #0056b3;">
-                💡 <b>提示:</b> 搜索“中国”查看全国汇总数据；搜索“广东省”等查看分省详情。
-            </div>
-        `;
-    }
+    if(descEl) descEl.innerHTML = theme.desc;
 }
 
 // 5. 搜索功能
@@ -140,20 +130,9 @@ function handleSearch() {
 
 function selectCountry(enName) {
     const layers = geojsonLayers.flatMap(l => Object.values(l._layers));
-    
-    // 如果搜的是 China，我们让地图飞到一个固定的中国中心坐标
-    if (enName === "China") {
-        map.flyTo([35, 105], 4); // 中国大致中心点
-        showDetail("China");
-        document.getElementById('search-results').style.display = 'none';
-        document.getElementById('search-box').value = "中国";
-        return;
-    }
-
-    // 其他国家或省份的正常跳转逻辑
     const target = layers.find(l => l.feature && l.feature.properties.name === enName);
     if(target) { 
-        map.flyTo(target.getBounds().getCenter(), 5); 
+        map.flyTo(target.getBounds().getCenter(), 4); 
         showDetail(enName); 
         document.getElementById('search-results').style.display = 'none'; 
         document.getElementById('search-box').value = getCnName(enName);

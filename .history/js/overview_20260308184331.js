@@ -97,17 +97,7 @@ function updateView() {
     document.getElementById('label-max').innerText = range.max;
     
     const descEl = document.getElementById('indicator-desc');
-    if(descEl && theme) { 
-        descEl.innerHTML = `
-            <div style="margin-bottom: 8px;">${theme.desc}</div>
-            <div style="font-size: 0.8rem; color: #666; border-top: 1px dashed #ddd; padding-top: 6px;">
-                <b>数据来源:</b> ${theme.source}
-            </div>
-            <div style="margin-top: 8px; padding: 6px; background: #f0f7ff; border-radius: 4px; font-size: 0.8rem; color: #0056b3; border-left: 3px solid #0056b3;">
-                💡 <b>提示:</b> 搜索“中国”查看全国汇总数据；搜索“广东省”等查看分省详情。
-            </div>
-        `;
-    }
+    if(descEl) descEl.innerHTML = theme.desc;
 }
 
 // 5. 搜索功能

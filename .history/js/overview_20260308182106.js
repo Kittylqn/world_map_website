@@ -33,17 +33,17 @@ const fieldLabelMap = {
 
 // 3. 指标视觉配置 (H: 色相)
 const indicatorThemes = {
-    gdp_per_capita: { h: 140, desc: "反映国民富裕程度。颜色越深，人均收入越高。", source: "世界银行 (World Bank) / IMF 2024" },
-    gdp_total: { h: 210, desc: "反映国家经济总量。数据已折算为十亿美元。", source: "IMF WEO / 各省统计局 2024公报" },
-    gdp_growth: { h: 30, desc: "反映经济活力。越橙红代表增长越快。", source: "各地区 2024 年度经济增速报告" },
-    gini: { h: 0, desc: "反映收入分配公平性。数值越高贫富差距越大。", source: "世界银行 / 联合国开发计划署" },
-    hdi: { h: 280, desc: "综合衡量发展水平（0-1）。反映人类发展质量。", source: "联合国开发计划署 (UNDP) 2024" },
-    pop_density: { h: 340, desc: "反映人口聚集度。深红色代表极其拥挤。", source: "2024 全球人口展望" },
-    median_age: { h: 200, desc: "反映人口老龄化程度。颜色越深代表平均年龄越高。", source: "CIA World Factbook" },
-    internet_user: { h: 180, desc: "反映数字化程度。颜色越深代表普及率越高。", source: "ITU 国际电信联盟 / CNNIC" },
-    forest_area: { h: 120, desc: "反映生态保护情况。颜色越深代表森林覆盖率越高。", source: "联合国粮农组织 (FAO)" },
-    co2_per_capita: { h: 10, desc: "反映人均碳排放。颜色越深代表排放量越高。", source: "Global Carbon Project" },
-    avg_temp: { h: 15, desc: "反映地区气候特征。颜色越深代表气温越高。", source: "NOAA / 欧洲中期预报中心" }
+    gdp_per_capita: { h: 140, desc: "反映国民富裕程度。颜色越深，人均收入越高。" },
+    gdp_total: { h: 210, desc: "反映国家经济总量。颜色越深，体量越大。" },
+    gdp_growth: { h: 30, desc: "反映经济活力。越橙红代表增长越快。" },
+    gini: { h: 0, desc: "反映收入分配公平性。颜色越深代表贫富差距越大。" },
+    hdi: { h: 280, desc: "综合衡量发展水平。紫色越深代表发展水平越高。" },
+    pop_density: { h: 340, desc: "反映人口聚集度。深红色代表极其拥挤。" },
+    median_age: { h: 200, desc: "反映人口老龄化程度。颜色越深代表平均年龄越高。" },
+    internet_user: { h: 180, desc: "反映数字化程度。颜色越深代表普及率越高。" },
+    forest_area: { h: 120, desc: "反映生态保护情况。颜色越深代表森林覆盖率越高。" },
+    co2_per_capita: { h: 10, desc: "反映人均碳排放。颜色越深代表排放量越高。" },
+    avg_temp: { h: 15, desc: "反映地区气候特征。颜色越深代表气温越高。" }
 };
 
 // 工具：安全获取国家中文名（防止字典未加载时报错）
@@ -97,17 +97,7 @@ function updateView() {
     document.getElementById('label-max').innerText = range.max;
     
     const descEl = document.getElementById('indicator-desc');
-    if(descEl && theme) { 
-        descEl.innerHTML = `
-            <div style="margin-bottom: 8px;">${theme.desc}</div>
-            <div style="font-size: 0.8rem; color: #666; border-top: 1px dashed #ddd; padding-top: 6px;">
-                <b>数据来源:</b> ${theme.source}
-            </div>
-            <div style="margin-top: 8px; padding: 6px; background: #f0f7ff; border-radius: 4px; font-size: 0.8rem; color: #0056b3; border-left: 3px solid #0056b3;">
-                💡 <b>提示:</b> 搜索“中国”查看全国汇总数据；搜索“广东省”等查看分省详情。
-            </div>
-        `;
-    }
+    if(descEl) descEl.innerHTML = theme.desc;
 }
 
 // 5. 搜索功能
@@ -180,7 +170,7 @@ function closeDetail() { document.getElementById('detail-card').style.display = 
 function toggleInfo() { document.getElementById('info-card').classList.toggle('collapsed'); }
 
 // 7. 数据加载：核心修复点（使用 CDN 镜像防止手机端超时）
-// 7. 数据加载：实现 CHN 映射与省份/国家双轨制
+// 7. 数据加载：视觉保留省份，逻辑回归国家整体
 Papa.parse("../data/macro_data.csv", {
     download: true, 
     header: true, 
@@ -194,41 +184,39 @@ Papa.parse("../data/macro_data.csv", {
         ];
         
         Promise.all(localUrls.map(u => fetch(u).then(res => res.json()))).then(([world, china]) => {
-            // --- 关键点 A：保留世界地图里的 China 作为一个“隐形成员”用于搜索 ---
-            const chinaMainlandFeature = world.features.find(f => 
-                f.properties.name === 'China' || f.properties.name === 'CHN'
-            );
+            // --- 核心逻辑：合并与重命名 ---
             
-            // 过滤掉世界地图显示的旧中国块（避免重叠），但保留这个 feature 对象到搜索库
+            // A. 过滤掉世界地图里自带的粗糙中国块
             const worldFiltered = world.features.filter(f => 
                 f.properties.name !== 'China' && f.properties.name !== 'CHN'
             );
 
-            // --- 关键点 B：标准化搜索库 ---
-            // 我们把过滤后的世界地图 + 详细的中国省份 + 刚才提取的中国总体对象全部塞进搜索库
-            allFeatures = [...worldFiltered, ...china.features];
-            
-            // 确保 "China" 存在于搜索库中
-            if (chinaMainlandFeature) {
-                // 强制修正名称为 China，确保匹配字典里的“中国”
-                chinaMainlandFeature.properties.name = "China"; 
-                allFeatures.push(chinaMainlandFeature);
-            }
+            // B. 处理中国省份：视觉保留边界，但逻辑上全部归为 "China"
+            china.features.forEach(f => {
+                // 保存省份名仅用于 Tooltip 显示（可选）
+                f.properties.province_name = f.properties.name; 
+                // 强制重写 ID 为 China，这样点击任何省份都会去找 macroData['China']
+                f.properties.name = "China"; 
+            });
 
-            // --- 关键点 C：渲染逻辑 ---
+            // C. 标准化搜索库：世界其他国家 + 只需要一个 "China"
+            // 我们取一个省份代表作为搜索锚点，或者手动添加
+            const searchAnchorChina = { properties: { name: "China" } };
+            allFeatures = [...worldFiltered, searchAnchorChina];
+
             const layerCfg = {
                 style: { weight: 1, color: 'white', fillOpacity: 0.8 },
                 onEachFeature: (f, l) => {
-                    // 如果是省份，properties.name 通常是“广东省”等
-                    // 如果是国家，properties.name 是 "China", "USA" 等
                     l.on('click', (e) => { 
                         L.DomEvent.stopPropagation(e); 
-                        showDetail(f.properties.name); 
+                        showDetail(f.properties.name); // 此时点击省份，f.properties.name 也是 "China"
                     });
                     
                     l.on('mouseover', () => {
+                        // Tooltip 依然可以显示省份名，增加交互感
+                        const displayName = f.properties.province_name || getCnName(f.properties.name);
                         const val = macroData[f.properties.name]?.[currentIndicator] || "无";
-                        l.bindTooltip(`<b>${getCnName(f.properties.name)}</b>: ${val}`, { sticky: true }).openTooltip();
+                        l.bindTooltip(`<b>${displayName}</b>: ${val}`, { sticky: true }).openTooltip();
                         l.setStyle({ weight: 2, color: '#333' });
                     });
                     l.on('mouseout', () => l.setStyle({ weight: 1, color: 'white' }));

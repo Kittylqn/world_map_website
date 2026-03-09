@@ -7,6 +7,7 @@ var map = L.map('map', {
     zoomControl: false 
 }).setView([35, 105], 4); 
 
+// 手动添加缩放控件到左下角
 L.control.zoom({
     position: 'bottomleft'
 }).addTo(map);
@@ -107,60 +108,16 @@ document.getElementById('search-input').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') window.searchPlace();
 });
 
-// 新增：右下角卡片收起逻辑
-window.toggleHeritageCard = function() {
-    const card = document.getElementById('heritage-card');
-    const arrow = document.getElementById('heritage-arrow');
-    card.classList.toggle('collapsed');
-    arrow.innerText = card.classList.contains('collapsed') ? '▲' : '▼';
-};
-
-// 更新右下角遗产列表
-function updateHeritageList(placeId) {
-    const hint = document.getElementById('heritage-hint');
-    const listContainer = document.getElementById('heritage-list');
-    const title = document.getElementById('heritage-title');
-    const card = document.getElementById('heritage-card');
-
-    const localLandmarks = allLandmarks.filter(row => 
-        row.country_en === placeId || (placeId === 'China' && /省|市|自治区/.test(placeId))
-    );
-
-    if (localLandmarks.length > 0) {
-        hint.style.display = 'none';
-        listContainer.innerHTML = localLandmarks.map(row => `
-            <a href="${row.link}" target="_blank" class="heritage-list-item">
-                <b>🏛️ ${row.name}</b>
-                <span>${row.desc.substring(0, 30)}...</span>
-            </a>
-        `).join('');
-        title.innerText = `💎 ${getCnName(placeId)} 的遗产`;
-        // 自动展开展示成果
-        card.classList.remove('collapsed');
-        document.getElementById('heritage-arrow').innerText = '▼';
-    } else {
-        hint.style.display = 'block';
-        listContainer.innerHTML = '';
-        title.innerText = `💎 探索世界遗产`;
-    }
-}
-
 window.toggleState = function(placeId, type) {
     let targetArray = type === 'visited' ? visitedPlaces : interestedPlaces;
     let otherArray = type === 'visited' ? interestedPlaces : visitedPlaces;
     
     const index = targetArray.indexOf(placeId);
-    if (index > -1) { 
-        targetArray.splice(index, 1); 
-    } else {
+    if (index > -1) { targetArray.splice(index, 1); } 
+    else {
         targetArray.push(placeId); 
         const otherIndex = otherArray.indexOf(placeId);
         if (otherIndex > -1) otherArray.splice(otherIndex, 1);
-        
-        // 如果是设为感兴趣，触发右下角联动
-        if (type === 'interested') {
-            updateHeritageList(placeId);
-        }
     }
 
     localStorage.setItem('myVisitedPlaces', JSON.stringify(visitedPlaces));
@@ -196,7 +153,7 @@ function renderMarkers() {
                 <div style="min-width:200px;">
                     <h4 style="margin:0 0 5px 0; color:#d35400;">🏆 ${row.name}</h4>
                     <p style="font-size:0.9em; margin:0 0 8px 0;">${row.desc}</p>
-                    <a href="${row.link}" target="_blank">了解更多 ↗</a>
+                    <a href="${row.link}" target="_blank">了解详情 ↗</a>
                 </div>
             `);
             markerLayer.addLayer(marker);
